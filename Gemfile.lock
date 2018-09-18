@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rack-corsgate (0.1.0)
+    rack-corsgate (0.2.1)
 
 GEM
   remote: https://rubygems.org/
