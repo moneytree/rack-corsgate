@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name        = 'rack-corsgate'
-  spec.version     = '0.1.0'
+  spec.version     = '0.2.0'
   spec.date        = '2018-09-13'
   spec.summary     = 'Modern CORS-based CSRF-protection for Rack apps'
   spec.description = 'This middleware builds on top of rack-cors, using CORS rules to mitigate CSRF-attacks.'
