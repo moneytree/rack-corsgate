@@ -38,17 +38,8 @@ module Rack
     private
 
     def is_allowed(env, origin, method)
-      # if strict, require an Origin header
-      if origin.nil?
-        return true unless @strict
-
-        # if strict, but allow_safe we let GET and HEAD through
-        if @allow_safe && ['GET', 'HEAD'].include?(method)
-          return true
-        end
-        return false
-      end
-
+      return true if @allow_safe && ['GET', 'HEAD'].include?(method.upcase)
+      return true if !@strict && origin.nil?
       env['rack.cors'].hit?
     end
   end

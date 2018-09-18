@@ -55,7 +55,7 @@ config.middleware.insert_before Rack::Cors, Rack::CorsGateOriginProcessor, { rem
 - `remove_null_origin` (boolean, default: false): Treats `null` (string) origin headers as if no origin header was set.
 
 ```ruby
-config.middleware.insert_after Rack::Cors, Rack::CorsGate, { simulation: false, strict: true, allow_safe: true } do |env, origin, method|
+config.middleware.insert_after Rack::Cors, Rack::CorsGate, { simulation: false, strict: false, allow_safe: true } do |env, origin, method|
   # env: https://www.rubydoc.info/github/rack/rack/master/file/SPEC#label-The+Environment
 
   Rails.logger.warn("Blocked #{method} request from origin #{origin} to #{env['PATH_INFO']}")
@@ -66,8 +66,10 @@ end
 
 - `simulation` (boolean, default: false): Allows potential attacks to be carried out as if the middleware wasn't there.
   This can be useful during implementation trials and tests (see also the block signature below).
-- `strict` (boolean, default: false): If true, requires an origin to be present on all requests.
-- `allow_safe` (boolean, default: false): If true, allows `GET` and `HEAD` requests without an origin.
+- `strict` (boolean, default: false): If true, requires an origin to be present on all requests. Note that a Referer
+  header will stand in for a missing Origin header if the CorsGateOriginProcessor is used.
+- `allow_safe` (boolean, default: false): If true, allows `GET` and `HEAD` requests through, even if the origin is not
+  allowed by CORS, or if the Origin header is missing.
 
 Block `|env, origin, method|`:
 

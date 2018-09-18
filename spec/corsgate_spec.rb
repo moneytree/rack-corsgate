@@ -6,11 +6,8 @@ require 'rack/test'
 describe Rack::CorsGate do
   include Rack::Test::Methods
 
-  @opts = {}
-  @block = nil
-
   before(:each) do
-    @opts = {}
+    @middleware_opts = {}
     @block = nil
   end
 
@@ -21,134 +18,250 @@ describe Rack::CorsGate do
   def app
     builder = Rack::Builder.new
 
-    builder.use Rack::CorsGateOriginProcessor, @opts
+    builder.use Rack::CorsGateOriginProcessor, @middleware_opts
     builder.use Rack::Cors do
       allow do
-        origins 'valid-origin.com'
+        origins 'https://valid-origin.com'
         resource '*', :headers => :any, :methods => [:get, :post, :put, :delete, :options]
       end
     end
 
-    builder.use Rack::CorsGate, @opts, &@block
+    builder.use Rack::CorsGate, @middleware_opts, &@block
     builder.run success_response
     builder.to_app
   end
 
-  it 'can GET without origin, with strict: true, allow_safe: true' do
-    @opts = { strict: true, allow_safe: true }
+  def req(method, origin, referer, opts, expected_status)
+    @middleware_opts = opts
 
-    get '/foo.json'
+    header 'Origin', origin unless origin.nil?
+    header 'Referer', referer unless referer.nil?
 
-    expect(last_response.status).to be 200
+    case method
+    when 'GET'
+      get '/foo.json'
+    when 'POST'
+      post '/foo.json'
+    else
+      throw :bad_method, method
+    end
+
+    expect(last_response.status).to eq expected_status
   end
 
-  it 'cannot GET without origin, with strict: true, allow_safe: false' do
-    @opts = { strict: true, allow_safe: false }
+  describe 'strict: false, allow_safe: true' do
+    opts = { strict: false, allow_safe: true }
 
-    get '/foo.json'
+    it 'can GET without origin' do
+      req('GET', nil, nil, opts, 200)
+    end
 
-    expect(last_response.status).to be 403
+    it 'can GET with valid origin' do
+      req('GET', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can GET with valid referer' do
+      req('GET', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'can GET with invalid origin' do
+      req('GET', 'https://invalid-origin.com', nil, opts, 200)
+    end
+
+    it 'can POST without origin' do
+      req('POST', nil, nil, opts, 200)
+    end
+
+    it 'can POST with valid origin' do
+      req('POST', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can POST with valid referer' do
+      req('POST', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'cannot POST with invalid origin' do
+      req('POST', 'https://invalid-origin.com', nil, opts, 403)
+    end
   end
 
-  it 'cannot POST without origin, with strict: true, allow_safe: true' do
-    @opts = { strict: true, allow_safe: true }
+  describe 'strict: false, allow_safe: false' do
+    opts = { strict: false, allow_safe: false }
 
-    post '/foo.json'
+    it 'can GET without origin' do
+      req('GET', nil, nil, opts, 200)
+    end
 
-    expect(last_response.status).to be 403
+    it 'can GET with valid origin' do
+      req('GET', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can GET with valid referer' do
+      req('GET', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'cannot GET with invalid origin' do
+      req('GET', 'https://invalid-origin.com', nil, opts, 403)
+    end
+
+    it 'can POST without origin' do
+      req('POST', nil, nil, opts, 200)
+    end
+
+    it 'can POST with valid origin' do
+      req('POST', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can POST with valid referer' do
+      req('POST', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'cannot POST with invalid origin' do
+      req('POST', 'https://invalid-origin.com', nil, opts, 403)
+    end
   end
 
-  it 'cannot POST without origin, with strict: true, allow_safe: false' do
-    @opts = { strict: true, allow_safe: false }
+  describe 'strict: true, allow_safe: true' do
+    opts = { strict: true, allow_safe: true }
 
-    post '/foo.json'
+    it 'can GET without origin' do
+      req('GET', nil, nil, opts, 200)
+    end
 
-    expect(last_response.status).to be 403
+    it 'can GET with valid origin' do
+      req('GET', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can GET with valid referer' do
+      req('GET', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'can GET with invalid origin' do
+      req('GET', 'https://invalid-origin.com', nil, opts, 200)
+    end
+
+    it 'cannot POST without origin' do
+      req('POST', nil, nil, opts, 403)
+    end
+
+    it 'can POST with valid origin' do
+      req('POST', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can POST with valid referer' do
+      req('POST', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'cannot POST with invalid origin' do
+      req('POST', 'https://invalid-origin.com', nil, opts, 403)
+    end
   end
 
-  it 'can POST without origin, with strict: false' do
-    @opts = { strict: false }
+  describe 'strict: true, allow_safe: false' do
+    opts = { strict: true, allow_safe: false }
 
-    post '/foo.json'
+    it 'cannot GET without origin' do
+      req('GET', nil, nil, opts, 403)
+    end
 
-    expect(last_response.status).to be 200
+    it 'can GET with valid origin' do
+      req('GET', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can GET with valid referer' do
+      req('GET', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'cannot GET with invalid origin' do
+      req('GET', 'https://invalid-origin.com', nil, opts, 403)
+    end
+
+    it 'cannot POST without origin' do
+      req('POST', nil, nil, opts, 403)
+    end
+
+    it 'can POST with valid origin' do
+      req('POST', 'https://valid-origin.com', nil, opts, 200)
+    end
+
+    it 'can POST with valid referer' do
+      req('POST', nil, 'https://valid-origin.com/foo', opts, 200)
+    end
+
+    it 'cannot POST with invalid origin' do
+      req('POST', 'https://invalid-origin.com', nil, opts, 403)
+    end
   end
 
-  it 'cannot GET from invalid origin, even with strict: false' do
-    @opts = { strict: false }
+  describe 'remove_null_origin: true' do
+    it 'can GET with "null" origin and strict: true, allow_safe: true' do
+      opts = { remove_null_origin: true, strict: true, allow_safe: true }
 
-    header 'Origin', 'invalid-origin.com'
-    get '/foo.json'
+      req('GET', 'null', nil, opts, 200)
+    end
 
-    expect(last_response.status).to be 403
+    it 'cannot GET with "null" origin and strict: true, allow_safe: false' do
+      opts = { remove_null_origin: true, strict: true, allow_safe: false }
+
+      req('GET', 'null', nil, opts, 403)
+    end
+
+    it 'cannot POST with "null" origin and strict: true, allow_safe: true' do
+      opts = { remove_null_origin: true, strict: true, allow_safe: true }
+
+      req('POST', 'null', nil, opts, 403)
+    end
   end
 
-  it 'can GET with "null" origin if we allow it, and with strict: true, allow_safe: true' do
-    @opts = { remove_null_origin: true, strict: true, allow_safe: true }
+  describe 'remove_null_origin: false' do
+    it 'can GET with "null" origin and strict: true, allow_safe: true' do
+      opts = { remove_null_origin: false, strict: true, allow_safe: true }
 
-    header 'Origin', 'null'
-    get '/foo.json'
+      req('GET', 'null', nil, opts, 200)
+    end
 
-    expect(last_response.status).to be 200
+    it 'cannot GET with "null" origin and strict: true, allow_safe: false' do
+      opts = { remove_null_origin: false, strict: true, allow_safe: false }
+
+      req('GET', 'null', nil, opts, 403)
+    end
+
+    it 'cannot POST with "null" origin and strict: true, allow_safe: true' do
+      opts = { remove_null_origin: false, strict: true, allow_safe: true }
+
+      req('POST', 'null', nil, opts, 403)
+    end
   end
 
-  it 'can GET with "null" origin if we allow it, and with strict: false' do
-    @opts = { remove_null_origin: true, strict: false }
+  describe 'simulation-mode' do
+    opts = { simulation: true }
 
-    header 'Origin', 'null'
-    get '/foo.json'
+    it 'can POST from invalid origin in simulation-mode' do
+      req('POST', 'https://invalid-origin.com', nil, opts, 200)
+    end
 
-    expect(last_response.status).to be 200
+    it 'can POST from invalid referer in simulation-mode' do
+      req('POST', nil, 'https://invalid-origin.com/foo', opts, 200)
+    end
   end
 
-  it 'cannot POST with "null" origin if we do not allow it, with strict: true' do
-    @opts = { remove_null_origin: false, strict: true }
+  describe 'failure-handler' do
+    it 'invokes handler block when rejecting' do
+      opts = {}
+      called = 0
+      @block = -> (env, origin, path) { called += 1 }
 
-    header 'Origin', 'null'
-    post '/foo.json'
+      req('POST', 'https://invalid-origin.com', nil, opts, 403)
+      expect(called).to be 1
+    end
 
-    expect(last_response.status).to be 403
-  end
+    it 'invokes handler block when rejecting in simulation mode (despite 200)' do
+      opts = { simulation: true }
+      called = 0
+      @block = -> (env, origin, path) { called += 1 }
 
-  it 'cannot POST from invalid origin' do
-    header 'Origin', 'invalid-origin.com'
-    post '/foo.json'
-
-    expect(last_response.status).to be 403
-  end
-
-  it 'cannot POST from invalid referer' do
-    header 'Referer', 'https://invalid-origin.com/index.html'
-    post '/foo.json'
-
-    expect(last_response.status).to be 403
-  end
-
-  it 'can POST from invalid origin in simulation-mode' do
-    @opts = { simulation: true }
-
-    header 'Origin', 'invalid-origin.com'
-    post '/foo.json'
-
-    expect(last_response.status).to be 200
-  end
-
-  it 'can POST from invalid referer in simulation-mode' do
-    @opts = { simulation: true }
-
-    header 'Referer', 'https://invalid-origin.com/index.html'
-    post '/foo.json'
-
-    expect(last_response.status).to be 200
-  end
-
-  it 'invokes handler when it cannot POST from invalid origin' do
-    called = 0
-    @block = -> (env, origin, path) { called += 1 }
-
-    header 'Origin', 'invalid-origin.com'
-    post '/foo.json'
-    expect(last_response.status).to be 403
-    expect(called).to be 1
+      req('POST', 'https://invalid-origin.com', nil, opts, 200)
+      expect(called).to be 1
+    end
   end
 end
