@@ -18,6 +18,12 @@ Or in your Gemfile:
 gem 'rack-corsgate'
 ```
 
+**Dependencies**
+
+Your application must have `Rack::Cors` available. See: [Rack CORS Middleware](https://github.com/cyu/rack-cors)
+
+Follow the configuration requirements given in its readme.
+
 ## Configuration
 
 CorsGate is actually two middleware functions:
